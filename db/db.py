@@ -1,33 +1,45 @@
 class _Storage:
-    __storage = {}
-    __storage_values_info = {}
+    __keys = {}
+    __values = {}
+
+    @classmethod
+    def _remove_value(cls, key, value):
+        value = cls.__values.get(value, None)
+        if value:
+            if value[0]:
+                value[0] -= 1
+            value[1].discard(key)
 
     @classmethod
     def set(cls, key, value):
-        cls.__storage[key] = value
-        value_info = cls.__storage_values_info.setdefault(value, [0, set()])
-        value_info[0] += 1
-        value_info[1].add(key)
+        old_value = cls.__keys.get(key, None)
+        if old_value == value:
+            return
+        if old_value:
+            cls._remove_value(key, old_value)
+        cls.__keys[key] = value
+        value = cls.__values.setdefault(value, [0, set()])
+        value[0] += 1
+        value[1].add(key)
 
     @classmethod
     def get(cls, key):
-        return cls.__storage.get(key, 'NULL')
+        return cls.__keys.get(key, 'NULL')
 
     @classmethod
     def unset(cls, key):
-        if key in cls.__storage:
-            cls.__storage_values_info.pop(cls.__storage.pop(key), None)
-            cls.__storage_values_info.pop(cls.__storage.pop(key), None)
+        if key in cls.__keys:
+            cls._remove_value(key, cls.__keys.pop(key))
 
     @classmethod
     def counts(cls, value):
-        info = cls.__storage_values_info.get(value, None)  # type: dict
-        return info[0] if info else 0
+        value = cls.__values.get(value, None)
+        return value[0] if value else 0
 
     @classmethod
     def find(cls, value):
-        info = cls.__storage_values_info.get(value, None)  # type: dict
-        return ', '.join(info[1]) if info else None
+        value = cls.__values.get(value, None)
+        return value[1] if value else None
 
 
 class DB:
