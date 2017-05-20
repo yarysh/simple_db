@@ -1,14 +1,16 @@
+from .exceptions import TransactionError
+
 class _Storage:
     __keys = {}
     __values = {}
 
     @classmethod
     def _remove_value(cls, key, value):
-        value = cls.__values.get(value, None)
-        if value:
-            if value[0]:
-                value[0] -= 1
-            value[1].discard(key)
+        value_data = cls.__values.get(value, None)
+        if value_data:
+            value_data.discard(key)
+            if not value_data:
+                del cls.__values[value]
 
     @classmethod
     def set(cls, key, value):
@@ -18,9 +20,8 @@ class _Storage:
         if old_value:
             cls._remove_value(key, old_value)
         cls.__keys[key] = value
-        value = cls.__values.setdefault(value, [0, set()])
-        value[0] += 1
-        value[1].add(key)
+        value = cls.__values.setdefault(value, set())
+        value.add(key)
 
     @classmethod
     def get(cls, key):
@@ -32,16 +33,57 @@ class _Storage:
             cls._remove_value(key, cls.__keys.pop(key))
 
     @classmethod
-    def counts(cls, value):
-        value = cls.__values.get(value, None)
-        return value[0] if value else 0
-
-    @classmethod
     def find(cls, value):
-        value = cls.__values.get(value, None)
-        return value[1] if value else None
+        keys = cls.__values.get(value, None)
+        return keys.copy() if keys is not None else set()
 
 
 class DB:
     def __init__(self):
         self._transactions = []
+
+    def begin(self):
+        self._transactions.append([])
+
+    def commit(self):
+        if not self._transactions:
+            raise TransactionError('Transaction not started')
+        for operation in self._transactions.pop():
+            _Storage.unset(*operation) if len(operation) == 1 else _Storage.set(*operation)
+
+    def rollback(self):
+        if not self._transactions:
+            raise TransactionError('Transaction not started')
+        self._transactions.pop()
+
+    def get(self, key):
+        for transaction in reversed(self._transactions):
+            for operation in reversed(transaction):
+                if operation[0] == key:
+                    return operation[1] if len(operation) == 2 else 'NULL'
+        return _Storage.get(key)
+
+    def set(self, key, value):
+        if self._transactions:
+            self._transactions[-1].append((key, value))
+        else:
+            _Storage.set(key, value)
+
+    def unset(self, key):
+        if self._transactions:
+            self._transactions[-1].append((key,))
+        else:
+            _Storage.unset(key)
+
+    def find(self, value):
+        keys = _Storage.find(value)
+        for transaction in self._transactions:
+            for operation in transaction:
+                if len(operation) == 1:
+                    keys.discard(operation[0])
+                elif len(operation) == 2 and operation[1] == value:
+                    keys.add(operation[0])
+        return keys
+
+    def count(self, value):
+        return len(self.find(value))
