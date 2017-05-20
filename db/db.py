@@ -1,5 +1,6 @@
 from .exceptions import TransactionError
 
+
 class _Storage:
     __keys = {}
     __values = {}
@@ -85,5 +86,5 @@ class DB:
                     keys.add(operation[0])
         return keys
 
-    def count(self, value):
+    def counts(self, value):
         return len(self.find(value))
