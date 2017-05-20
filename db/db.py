@@ -42,6 +42,7 @@ class _Storage:
 class DB:
     def __init__(self):
         self._transactions = []
+        self._committed_keys = set()
 
     def begin(self):
         self._transactions.append([])
@@ -51,13 +52,17 @@ class DB:
             raise TransactionError('Transaction not started')
         for operation in self._transactions.pop():
             _Storage.unset(*operation) if len(operation) == 1 else _Storage.set(*operation)
+            self._committed_keys.add(operation[0])
 
     def rollback(self):
         if not self._transactions:
             raise TransactionError('Transaction not started')
-        self._transactions.pop()
+        for operation in self._transactions.pop():
+            self._committed_keys.discard(operation[0])
 
     def get(self, key):
+        if not self._transactions or (key in self._committed_keys):
+            return _Storage.get(key)
         for transaction in reversed(self._transactions):
             for operation in reversed(transaction):
                 if operation[0] == key:
@@ -66,12 +71,14 @@ class DB:
 
     def set(self, key, value):
         if self._transactions:
+            self._committed_keys.discard(key)
             self._transactions[-1].append((key, value))
         else:
             _Storage.set(key, value)
 
     def unset(self, key):
         if self._transactions:
+            self._committed_keys.discard(key)
             self._transactions[-1].append((key,))
         else:
             _Storage.unset(key)
@@ -80,10 +87,10 @@ class DB:
         keys = _Storage.find(value)
         for transaction in self._transactions:
             for operation in transaction:
-                if len(operation) == 1:
-                    keys.discard(operation[0])
-                elif len(operation) == 2 and operation[1] == value:
+                if len(operation) == 2 and operation[1] == value:
                     keys.add(operation[0])
+                else:
+                    keys.discard(operation[0])
         return keys
 
     def counts(self, value):

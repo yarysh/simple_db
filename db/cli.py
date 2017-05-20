@@ -1,4 +1,5 @@
 import sys
+from six.moves import input
 
 from .db import DB
 
@@ -18,14 +19,14 @@ class CLI:
         if result:
             print(', '.join(result) if type(result) in (set, list) else result)
         else:
-            print('')
+            print('' if result != 0 else 0)
 
     def run(self):
-        print('SimpleDB cli interface, enter command:')
+        print('*** SimpleDB CLI (ver. 0.1) ***')
         while True:
             try:
-                command = raw_input('>>> ').split()
-                result = self._exec(command[0], *command[1:])
+                command = input('>>> ').strip().split()
+                result = self._exec(command[0] if command else '', *command[1:])
                 self._pretty_print(result)
             except Exception as error:
                 print('Command error: %s' % error)
