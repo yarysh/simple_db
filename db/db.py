@@ -3,7 +3,10 @@ from .exceptions import TransactionError
 
 class _Storage:
     __keys = {}
+    """Main DB storage: {<key>: <value>, ...}"""
+
     __values = {}
+    """Additional storage for quick FIND by value: {<value>: {<key>, <key>, ...}, ...}"""
 
     @classmethod
     def _remove_value(cls, key, value):
@@ -42,7 +45,12 @@ class _Storage:
 class DB:
     def __init__(self):
         self._transactions = []
+        """Transactions stack: [[(<key>, <value>), (<key>,), ...], [(<key>,), ...], ...]
+        Each has her own list. (<key>, <value>) - for SET, (<key>,) - for UNSET
+        """
+
         self._committed_keys = set()
+        """Committed keys storage, for returning current key's value from Storage(not from self._transactions)"""
 
     def begin(self):
         self._transactions.append([])
